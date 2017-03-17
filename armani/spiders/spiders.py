@@ -2,33 +2,34 @@ import scrapy
 import time
 from scrapy.spiders import CrawlSpider, Rule
 from scrapy.linkextractors import LinkExtractor
+from scrapy.utils.project import get_project_settings
 
 
-class QuotesSpider(CrawlSpider):
-    name = "quotes"
+class ArmaniSpider(CrawlSpider):
+    name = "armani"
     allowed_domains = ['armani.com']
-    start_urls = ['http://www.armani.com/us']
 
     rules = (
         Rule(LinkExtractor(allow=('_cod', )), callback='parse_main'),
         Rule(LinkExtractor(allow=(
-            # '/women$', 
-            # '/men$', 
+            '/women$', 
+            '/men$', 
             '/armanijunior', 
-            # 'kids/secondary$',
-            # '/onlinestore/',
+            'kids/secondary$',
+            '/onlinestore/',
             ), unique=True), follow=True),
-        # Rule(LinkExtractor(allow=('/women$', '/onlinestore/',)), follow=True),
     )
 
-    # def start_requests(self):
-    #     urls = [
-    #         # 'http://quotes.toscrape.com/page/1/',
-    #         # 'http://www.armani.com/us',
-    #         'http://www.armani.com/us/emporioarmani/crewneck-sweater_cod39692915ji.html'
-    #         # 'http://quotes.toscrape.com/page/2/',
-    #     ]
-  
+    def __init__(self, *a, **kw):
+        super(ArmaniSpider, self).__init__(*a, **kw)
+        self._get_regions()
+
+    def _get_regions(self):
+        selected_regions = getattr(self, 'region', None)
+        if selected_regions:
+            self.start_urls = ['http://www.armani.com/{}'.format(rgn) for rgn in selected_regions.split('/')]
+        else:
+            self.start_urls = ['http://www.armani.com/{}'.format(get_project_settings.get('DEFAULT_REGION'))]
 
     def parse_main(self, response):
         def get_list(query):
@@ -45,7 +46,7 @@ class QuotesSpider(CrawlSpider):
             return 'None'
 
         def get_availability(query):
-            if query.css('button::text').extract_first() == 'Add to Shopping Bag':
+            if query.css('button::text').extract_first():
                 return True
             return False
 
@@ -59,13 +60,6 @@ class QuotesSpider(CrawlSpider):
             'availability': get_availability(response.css('div.buttonBox')),
             'color': get_list_with_inner(response.css('ul.Colors')),
             'size': get_list_with_inner(response.css('ul.SizeW')),
-            'region': response.css('a.shippingTo::text').extract_first(),
+            'region': response.url.split("/")[3],
             'description': get_list(response.css('ul.descriptionList')),
         }
-
-        # page = response.url.split("/")[1]
-        # filename = 'quotes-%s.html' % page
-        # with open(filename, 'wb') as f:
-        #     f.write(response.body)
-        # self.log('Saved file %s' % filename)
-
